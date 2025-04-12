@@ -27,24 +27,24 @@ class UserServiceTest {
     @Test
     void shouldCreateUserSuccessfully() {
         UserRequest request = buildRequest();
-        User saved = new User(1L, request.getFullName(), request.getEmail(), request.getNationalId(), request.getPassword());
+        User saved = new User(1L, request.fullName(), request.email(), request.nationalId(), request.password());
 
-        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
-        when(userRepository.existsByNationalId(request.getNationalId())).thenReturn(false);
+        when(userRepository.existsByEmail(request.email())).thenReturn(false);
+        when(userRepository.existsByNationalId(request.nationalId())).thenReturn(false);
         when(userRepository.save(any())).thenReturn(saved);
 
         var response = userService.create(request);
 
         assertNotNull(response);
-        assertEquals("dayvson@email.com", response.getEmail());
-        assertEquals("Dayvson", response.getFullName());
+        assertEquals("dayvson@email.com", response.email());
+        assertEquals("Dayvson", response.fullName());
         verify(userRepository).save(any());
     }
 
     @Test
     void shouldThrowIfEmailAlreadyExists() {
         UserRequest request = buildRequest();
-        when(userRepository.existsByEmail(request.getEmail())).thenReturn(true);
+        when(userRepository.existsByEmail(request.email())).thenReturn(true);
 
         var ex = assertThrows(IllegalArgumentException.class, () -> userService.create(request));
         assertEquals("Email already exists", ex.getMessage());
@@ -53,8 +53,8 @@ class UserServiceTest {
     @Test
     void shouldThrowIfNationalIdAlreadyExists() {
         UserRequest request = buildRequest();
-        when(userRepository.existsByEmail(request.getEmail())).thenReturn(false);
-        when(userRepository.existsByNationalId(request.getNationalId())).thenReturn(true);
+        when(userRepository.existsByEmail(request.email())).thenReturn(false);
+        when(userRepository.existsByNationalId(request.nationalId())).thenReturn(true);
 
         var ex = assertThrows(IllegalArgumentException.class, () -> userService.create(request));
         assertEquals("National Id already exists", ex.getMessage());
@@ -66,7 +66,7 @@ class UserServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
         var result = userService.findById(1L);
-        assertEquals("Dayvson", result.getFullName());
+        assertEquals("Dayvson", result.fullName());
     }
 
     @Test
@@ -77,11 +77,8 @@ class UserServiceTest {
     }
 
     private UserRequest buildRequest() {
-        UserRequest request = new UserRequest();
-        request.setFullName("Dayvson");
-        request.setEmail("dayvson@email.com");
-        request.setNationalId("123456789EU");
-        request.setPassword("123456");
+        UserRequest request = new UserRequest("Dayvson", "dayvson@email.com"
+        , "123456789EU", "123456");
         return request;
     }
 }

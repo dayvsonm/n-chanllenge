@@ -1,94 +1,86 @@
 package com.dayvson.n_challenge.controller;
 
 import com.dayvson.n_challenge.dto.UserRequest;
-import com.dayvson.n_challenge.dto.UserResponse;
-import com.dayvson.n_challenge.security.JwtUtil;
-import com.dayvson.n_challenge.service.UserService;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.beans.factory.annotation.Autowired;
+import io.restassured.RestAssured;
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.*;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import static io.restassured.RestAssured.*;
+import static org.hamcrest.Matchers.*;
 
-import java.util.List;
-
-@AutoConfigureMockMvc(addFilters = false)
-@WebMvcTest(UserController.class)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class UserControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    @LocalServerPort
+    private int port;
 
-    @Autowired
-    private UserService userService;
+    private static String token;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @TestConfiguration
-    static class MockConfig {
-        @Bean
-        public UserService userService() {
-            return mock(UserService.class);
-        }
-    }
-
-    @TestConfiguration
-    static class JwtConfig {
-        @Bean
-        public JwtUtil jwtUtil() {
-            return mock(JwtUtil.class);
-        }
-    }
-
-
-    @Test
-    @DisplayName("Should return 200 when fetching all users")
-    void shouldReturnUsers() throws Exception {
-        UserResponse response = new UserResponse();
-        response.setId(1L);
-        response.setFullName("Dayvson");
-        response.setEmail("dayvson@email.com");
-        response.setNationalId("123456789EU");
-
-        when(userService.findAll()).thenReturn(List.of(response));
-
-        mockMvc.perform(get("/api/users"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].email").value("dayvson@email.com"));
+    @BeforeEach
+    void setup() {
+        RestAssured.port = port;
     }
 
     @Test
-    @DisplayName("Should successfully create a user")
-    void shouldCreateUser() throws Exception {
-        UserRequest request = new UserRequest();
-        request.setFullName("Dayvson");
-        request.setEmail("dayvson@email.com");
-        request.setNationalId("123456789EU");
-        request.setPassword("123");
+    @Order(1)
+    void shouldLoginSuccessfully() {
+        String loginJson = """
+            {
+              "email": "dayvson@example.com",
+              "password": "1234safe"
+            }
+            """;
 
-        UserResponse response = new UserResponse();
-        response.setId(1L);
-        response.setFullName(request.getFullName());
-        response.setEmail(request.getEmail());
-        response.setNationalId(request.getNationalId());
+        token = given()
+                .contentType(ContentType.JSON)
+                .body(loginJson)
+                .when()
+                .post("/auth/login")
+                .then()
+                .statusCode(200)
+                .extract()
+                .asString();
+    }
 
-        when(userService.create(any())).thenReturn(response);
+    @Test
+    @Order(2)
+    void shouldCreateUserSuccessfully() {
+        UserRequest request = new UserRequest("Novo Usuário", "novo@email.com", "123456789ET", "senha123");
 
-        mockMvc.perform(post("/api/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.email").value("dayvson@email.com"));
+        given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(request)
+                .when()
+                .post("/api/users")
+                .then()
+                .log().all()
+                .statusCode(201)
+                .body("email", equalTo("novo@email.com"))
+                .body("fullName", equalTo("Novo Usuário"));
+    }
+
+    @Test
+    @Order(3)
+    void shouldListUsers() {
+        given().header("Authorization", "Bearer " + token).when().
+        get("/api/users")
+                .then()
+                .statusCode(200)
+                .body("$", not(empty()));
+    }
+
+    @Test
+    @Order(4)
+    void shouldGetUserById() {
+        given().header("Authorization", "Bearer " + token).when().
+        get("/api/users/1")
+                .then()
+                .statusCode(200)
+                .body("id", equalTo(1));
     }
 }
